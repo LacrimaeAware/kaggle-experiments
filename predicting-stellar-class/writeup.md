@@ -32,7 +32,7 @@ The baseline out-of-fold balanced accuracy uses early stopping on each validatio
 
 The strongest recorded gain came from revising the model ensemble, rather than adding the tested engineered features. Experiments 01 to 04 did not improve on the baseline beyond the reported out-of-fold variation. Experiment 06 combined diverse tree models through a logistic-regression stack and reached 0.96596 OOF balanced accuracy before threshold calibration; threshold calibration reduced that score slightly to 0.96591.
 
-The saved results support that comparison for these runs. A useful follow-up would fix a held-out evaluation split before further feature or model selection, then compare the revised LightGBM configuration with the full stack. The present experiments do not establish an upper bound on what these features can predict.
+The saved results support that comparison for these runs. A useful follow-up would fix a held-out evaluation split before further feature or model selection, then compare the revised LightGBM configuration with the full stack. The present experiments do not establish an upper bound on what these features can predict. The experiments in order, with the noise-floor lesson and the out-of-fold versus public-score distinction, are in [JOURNEY.md](JOURNEY.md).
 
 ## Leaderboard interpretation
 

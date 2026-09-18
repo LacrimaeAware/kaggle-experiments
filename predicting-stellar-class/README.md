@@ -1,11 +1,12 @@
 # Predicting Stellar Class
 
-Kaggle Playground Series, Season 6 Episode 6 (`playground-series-s6e6`), closed 2026-06-30. The task is to predict whether an astronomical object is a GALAXY, a QSO or a STAR from its sky coordinates, five photometric magnitudes, redshift and two categorical fields. The metric is balanced accuracy. The recorded results are in [writeup.md](writeup.md); the experiment records are indexed in [experiments/README.md](experiments/README.md).
+Kaggle Playground Series, Season 6 Episode 6 (`playground-series-s6e6`), closed 2026-06-30. The task is to predict whether an astronomical object is a GALAXY, a QSO or a STAR from its sky coordinates, five photometric magnitudes, redshift and two categorical fields. The metric is balanced accuracy. [JOURNEY.md](JOURNEY.md) tells the study in order: the baseline, experiments 01 to 06, the noise-floor lesson and the out-of-fold versus public-score distinction. The recorded results are in [writeup.md](writeup.md); the experiment records are indexed in [experiments/README.md](experiments/README.md).
 
 ## Layout
 
 | Location | Contents |
 |---|---|
+| `JOURNEY.md` | the study in order: experiments 01 to 06, what each tried and showed, the lessons |
 | `data/` (ignored by git) | `train.csv` (577,347 rows) and `test.csv` (247,435 rows) downloaded from Kaggle |
 | `baseline.py` | canonical run A: LightGBM multiclass, 5-fold StratifiedKFold, balanced class weights |
 | `experiments6.py` | canonical run B: five-model GBDT stack with a balanced logistic meta-model and threshold calibration |

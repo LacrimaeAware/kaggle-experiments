@@ -1,6 +1,6 @@
 # UMUD muscle architecture: the journey
 
-Kaggle competition "UMUD Challenge: Muscle Architecture in Ultrasound Data". Work ran from 2026-06-09 to 2026-07-01; the recorded best public score is 0.45615 (2026-07-01). This document follows the approach as it changed, with the public-score trajectory, the probes that lost, and the lessons.
+Kaggle competition "UMUD Challenge: Muscle Architecture in Ultrasound Data". The dated submission ledger runs from 2026-06-09 to 2026-07-01; the recorded best public score is 0.45615 (2026-07-01). This document follows the approach as it changed, with the public-score trajectory, the probes that lost, and the lessons.
 
 Every score is a Kaggle public leaderboard score (lower is better) carrying the submission date recorded in the private experiment log, the project's append-only submission ledger, unless another ledger is named. Local diagnostic numbers name their ledger too. Nothing was re-run for this document; the ledgers, the code and the recorded scores are the evidence. The submission files, the data, the weights and the day-to-day logs are not in this repository ([PROVENANCE.md](../PROVENANCE.md) says what they are and where they live).
 
