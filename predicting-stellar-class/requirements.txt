@@ -1,0 +1,8 @@
+# Python 3.13. Versions installed in the environment that produced the recorded runs.
+numpy==2.4.6
+pandas==3.0.3
+scipy==1.17.1
+scikit-learn==1.9.0
+lightgbm==4.6.0
+xgboost==3.2.0
+catboost==1.2.10
