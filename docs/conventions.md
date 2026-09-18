@@ -27,6 +27,7 @@ These rules apply to all committed documents in this repository: the README, the
   - Result: local cross-validation score and leaderboard score in a table, numbers first.
   - Caveat: what the result does not establish.
   - Lesson: what moved the score, what failed, and what to try next.
+- Each study's `JOURNEY.md` is the narrative of the study: question, approach, the dated trajectory of recorded results, what did not help, and lessons. A score appears only with its date and the name of the ledger that records it.
 
 ## Commits
 
