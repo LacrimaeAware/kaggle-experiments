@@ -1,0 +1,71 @@
+# UMUD submission log (canonical, public LB)
+
+Recorded public submissions, with the best first. The repository records a deadline of 2026-11-14
+and approximately five submissions per day; current availability and limits require live Kaggle
+confirmation. The previously reported rival score of **0.378**, **194 submissions**, and claim of
+no hand-labeling are historical context, not a freshly verified leaderboard snapshot.
+
+**Current best: `submission_thr_a0.50_f0.30.csv` = 0.45615** (fascicle mask threshold 0.30, apo at default
+0.50, on the 0.46041 lineage). Keep it as the final-selection candidate unless a later isolated
+submission beats it, as recorded in `RESULTS.md`. **Isolation verdict (2026-07-01): the entire win
+is the FASCICLE threshold recovering faint fascicles; the apo/MT change HURTS.** fasc-only 0.45615 (best) >
+combined a0.60_f0.30 0.45669 > apo-only a0.60_f0.50 0.47200 (worse than baseline). MT is NOT under-
+calibrated (raising it lost, like x0.95 lost). Live search is 1-D: push the FASCICLE threshold DOWN at
+apo 0.50; the higher-apo ladder is dead.
+
+| public score | submission | what it is | verdict |
+|---:|---|---|---|
+| **0.45615** | `submission_thr_a0.50_f0.30.csv` | fasc mask thr 0.30 (apo 0.50) | **BEST (2026-07-01)** |
+| 0.45669 | `submission_thr_a0.60_f0.30.csv` | apo 0.60 + fasc 0.30 | fasc win, apo drags |
+| 0.46041 | `submission_bandfix_flx105.csv` | family_b scale + band fix + PA+2.5 + FL x1.05 | prior best |
+| 0.47200 | `submission_thr_a0.60_f0.50.csv` | apo 0.60 only (MT up) | LOST (MT wants x1.0) |
+| 0.46076 | (aponeurosis band fix) | pick the apo pair fascicles sit between | superseded by +x1.05 |
+| 0.46314 | `submission_fam_pos_weight.csv` | downweight apo-hugging fascicles | +0.003 neutral |
+| 0.46686 | `submission_bandfix_flx105_paDown1.5.csv` | PA lowered 1.5 | LOST (PA wants high) |
+| 0.47473 | `submission_reproduced.csv` | median pipeline, one run | reproducible baseline |
+| ~0.488 | (family_b scale 134.5->147 px/cm) | per-image scale constant fix | real mechanistic win |
+| 0.48369 | `submission_flx110_on_best.csv` | FL x1.10 | LOST (x1.05 optimal) |
+| 0.48730 | `submission_fam_top_robusttri.csv` | bent superficial aponeurosis | LOST (straight is right) |
+| 0.49983 | `submission_minextrap.csv` | min-extrapolation FL mode | LOST |
+| 0.51435 | `submission_fam_curved.csv` | curved deep aponeurosis | LOST hard (straight is right) |
+| 0.53395 | `submission_mtx095_on_best.csv` | MT x0.95 | LOST (MT wants >= x1.0) |
+| 0.55033 | (PA +2.5, 0.55-era) | global PA shift | old-pipeline era |
+| 0.58910 | (shape-neighbor fallback scale) | | old-pipeline era |
+| 0.60961 | (temporal smoothing of outputs) | median PA/FL/MT within clips | LOST |
+| 0.61918 | (scale router + inner MT + fragment FL) | first wired pipeline | old baseline |
+
+## Lessons the board has proven (do not re-litigate)
+
+- **Global output tuning is bracketed/spent:** PA optimum ~+2.4 (lowering it lost: paDown 0.46686),
+  FL x1.05 optimal (x1.10 lost), MT x1.0 optimal (x0.95 lost hard).
+- **Aponeurosis SHAPE is dead:** curving the deep apo (0.51435) and bending the superficial (0.48730)
+  both lose. The straight-line aponeurosis IS the ground-truth convention.
+- **Fascicle weighting is neutral; band selection is audit-confirmed correct.**
+- => the measurement geometry is exhausted. The remaining error is the OOD masks: WHERE the straight
+  lines sit and WHICH fascicles exist.
+
+## Open search fronts (the grind)
+
+1. **Mask thresholds** (`benchmark_lab/generate_threshold_sweep.py`): apo/fasc binarization threshold moves the line
+  positions + fascicle detection for free (no retrain). Best so far is fasc 0.30 at apo 0.50; keep
+  pushing the fascicle threshold lower on that same apo setting before branching back out.
+2. **OOD-augmentation retrain** (`UMUD_AUG_LEVEL=ood`; recipe kept in the private working repository): a better mask on the
+  test-only domains. Kaggle GPU. The structural lever.
+3. TTA variants, morphological mask cleanup, per-family thresholds, and combinations of any winner.
+
+## Provenance of the recorded best (0.45615)
+
+Reconstructed on 2026-09-17 from the repository history and the local working tree. Nothing was
+re-run; where a record was not kept at the time, the row says so.
+
+| item | record |
+|---|---|
+| Public score | 0.45615, recorded on 2026-07-01 in the project's experiment log (private), `docs/RESULTS.md`, `VERIFIED_FACTS.md` and this log |
+| Output file | `results/submission_thr_a0.50_f0.30.csv`: 11,114 bytes, 309 rows plus header, file date 2026-07-01 14:23, sha256 `fd81b41faa851f42157b198a6b1c1210c794eb40262ee7d88fe8caeb630c117c`. Local copy, ignored by git |
+| Generator | `benchmark_lab/generate_threshold_sweep.py`, added in `07fc392` (2026-07-01); env-configurable grids in `acca15d`; CSV-first fix in `a3c4b6d` (last change to the file) |
+| Invocation | `UMUD_APO_THRS=0.50 UMUD_FASC_THRS=0.30 python benchmark_lab/generate_threshold_sweep.py` from the study folder. Reconstructed from the sweep script and the file name, not from a saved shell log: the default grid (0.40, 0.50, 0.60) does not contain 0.30, so the fascicle grid was set by the variable. The 14:23 file dates cover `a0.50` and `a0.60` with `f0.20`, `f0.25`, `f0.30` and `f0.35`, so the batch most likely used both threshold lists; the single-pair form above writes the same file |
+| Pipeline | `segment_then_measure.py` as of `007a9c4` (2026-07-01), the last commit touching it, imported by the generator. Effective settings: band fix on (`UMUD_BAND_FIX` default 1), `PA_SHIFT` 2.5 added by the generator, FL recentred to the prior mean and multiplied by 1.05 in the generator's `finalize()`, TTA on, scale router on. `PIPELINE_VERSION` string in the file: `2026-06-14.01` |
+| Weights | `results/seg_apo.pt`: 97,918,867 bytes, sha256 `4010d1399c0cdcb34191bf76ce78624355d88cd797c7f30916b2da478d91c134`. `results/seg_fasc.pt`: 97,919,663 bytes, sha256 `8878419c498819451007f533c4f5dc259a5ac9c89dcde8c42885e41bf6c6e811`. Both dated 2026-06-09 02:52; untracked local files. Training run: not recorded (no notebook run id, seed or log was kept). The configuration described as the one that produced them, in a comment of the project's training notebook: 12 epochs, U-Net, ResNet-34 encoder, image size 384, dice+BCE loss, light augmentation |
+| Base lineage | the sweep reproduces the post-processing of the `0.46041` file (band fix, FL recentre, FL x1.05). The documented one-run reproduction of the same pipeline scores 0.47473; `VERIFIED_FACTS.md` attributes the remaining ~0.014 to per-row residue of the older stack that no tracked script reproduces |
+| Sibling files | `results/` also holds `a0.50` with `f0.05` to `f0.35` and `a0.65` to `a0.80` with `f0.30` (dated 2026-07-01 14:42 and 22:47) without ledger rows; whether they were uploaded is not recorded |
+| Upload to Kaggle | not independently confirmed. No upload identity, timestamp or file hash was recorded at submission time; the score rests on the ledger entries above |

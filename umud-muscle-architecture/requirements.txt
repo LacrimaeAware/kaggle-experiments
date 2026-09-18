@@ -1,0 +1,13 @@
+# Python 3.13. torch is the CPU build used locally; the recorded weights were trained on Kaggle's GPU image.
+numpy==2.4.6
+pandas==3.0.3
+opencv-python-headless==4.13.0.92
+scikit-image==0.26.0
+Pillow==12.2.0
+openpyxl==3.1.5
+torch==2.12.0
+torchvision==0.27.0
+segmentation-models-pytorch==0.5.0
+albumentations==2.0.8
+# Optional, only for scale_ocr.py:
+# easyocr==1.7.2
