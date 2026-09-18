@@ -23,7 +23,7 @@ hypothesis note, not here. Pair with `docs/RESULTS.md`.
   curved deep apo 0.51435 (all lost).
 - threshold sweep on the 0.46041 lineage: apo 0.60 only -> 0.47200, apo 0.60 + fasc 0.30 -> 0.45669,
   fasc 0.30 only at apo 0.50 -> **0.45615 (current best, `submission_thr_a0.50_f0.30.csv`)**.
-- reproducible median pipeline, one `local_infer.py` run: 0.47473 (`submission_reproduced.csv`); the
+- reproducible median pipeline, one run of the private inference script `local_infer.py`: 0.47473 (`submission_reproduced.csv`); the
   ~0.014 gap to 0.460 is old per-row CSV residue, not a model difference.
 - min_extrap_top3 FL on that pipeline: **0.49983 (REFUTED 2026-06-15)**. The benchmark scored it 0.39
   (below the human floor) and it regressed the LB by 0.025: the benchmark does not predict the LB.
@@ -33,7 +33,7 @@ hypothesis note, not here. Pair with `docs/RESULTS.md`.
 - `PRIOR = {fl_mm:81.866, mt_mm:18.628, pa_deg:15.105}` `:96` (fl raised from 74.424 to bake in the
   LB-fitted FL level). Clips PA[5,45], FL[30,200], MT[10,50].
 - `USE_FL_RECENTER` default ON; applied in main() as `fl_mm *= PRIOR['fl_mm']/mean(fl_mm)`, and
-  `local_infer.py:98` applies the same pin regardless of the flag. Raw FL mean ~91.6, so the factor is
+  the private inference script (`local_infer.py:98`) applies the same pin regardless of the flag. Raw FL mean ~91.6, so the factor is
   ~0.89 (a ~11% shrink to mean 81.866). It is an active shortening device. (The old "0/309 no-op" came
   from re-applying the pin to an already-pinned file.)
 - `FL_FRAGMENT_MODE` default `median` `:107`. `min_extrap_top3` was tried and REFUTED on the LB

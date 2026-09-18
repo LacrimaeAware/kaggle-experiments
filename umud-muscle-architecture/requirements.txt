@@ -1,12 +1,13 @@
-# Python 3.13. torch is the CPU build used locally; the recorded weights were trained on Kaggle's GPU image.
+# Python 3.13. Versions installed in the environment that produced the recorded runs.
+# torch is the CPU build used locally; the recorded weights were trained on Kaggle's GPU image.
 numpy==2.4.6
 pandas==3.0.3
 opencv-python-headless==4.13.0.92
-scikit-image==0.26.0
-Pillow==12.2.0
-openpyxl==3.1.5
-torch==2.12.0
-torchvision==0.27.0
+scikit-image==0.26.0          # mask_geometry.py
+Pillow==12.2.0                # tick_calibration.py
+openpyxl==3.1.5               # benchmark_validate.py reads the benchmark spreadsheet
+torch==2.12.0                 # segment_then_measure.py and the threshold sweep (reference code)
+torchvision==0.27.0           # dependency of segmentation-models-pytorch, pinned to the version used
 segmentation-models-pytorch==0.5.0
 albumentations==2.0.8
 # Optional, only for scale_ocr.py:

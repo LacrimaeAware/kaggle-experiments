@@ -254,15 +254,15 @@ What the code needs:
   `data/`; `segment_then_measure.py` searches for the leaf folder names (`apo_images_new_model_v1`,
   `apo_masks_new_model_v1`, `fasc_images_new_model_v1`, `fasc_masks_new_model_v1`, `test_set_v2`)
   under `data/` or `/kaggle/input`, so the nesting does not matter.
-- Trained weights `results/seg_apo.pt` and `results/seg_fasc.pt` for inference (`local_infer.py`,
-  `benchmark_lab/generate_threshold_sweep.py`, `score_on_benchmark.py`). `segment_then_measure.py`
-  produces them (a Kaggle GPU notebook in the recorded runs). They are not tracked; their identity is
+- Trained weights `results/seg_apo.pt` and `results/seg_fasc.pt` for inference
+  (`benchmark_lab/generate_threshold_sweep.py` here; the inference and benchmark scripts are kept in
+  the private working repository). `segment_then_measure.py` produces them (a Kaggle GPU notebook in the recorded runs). They are not tracked; their identity is
   recorded in `docs/SUBMISSIONS.md`.
 - ImageNet-pretrained ResNet-34 encoder weights, downloaded by segmentation_models_pytorch at training
   time (`UMUD_MODEL_ENCODER_WEIGHTS=imagenet`). Inference loads the saved checkpoints with
   `encoder_weights=None`.
 - Optional, for local benchmark scoring only: the public 35-image expert benchmark (OSF), read by
-  `benchmark_validate.py` and `score_on_benchmark.py` from `Results_benchmark_architecture*.xlsx` and
+  `benchmark_validate.py` from `Results_benchmark_architecture*.xlsx` and
   the benchmark images under `data/`.
 
 What is not redistributed here: competition images and masks, the benchmark spreadsheet and images,

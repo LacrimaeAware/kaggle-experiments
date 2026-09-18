@@ -19,6 +19,6 @@ Exploratory experiment scripts and their notes, dated working logs, hand-off and
 | Stellar, baseline | public balanced accuracy 0.96523 | submission recorded on 2026-06-08 in the project journal; the submitted file's hash was not recorded |
 | Stellar, stack | public balanced accuracy 0.96659 | ledger entry of 2026-06-08; no submission record was kept, and the same-day experiment note listed the output file as not submitted. The measured result of the experiment is the out-of-fold score 0.96596 |
 | UMUD, best | public UMUD score 0.45615 | recorded on 2026-07-01 in the project ledgers; generator, pipeline commit, weights and output hash are reconstructed in `umud-muscle-architecture/docs/SUBMISSIONS.md`; the upload itself is not independently confirmed |
-| UMUD, reproduction | public UMUD score 0.47473 | recorded on 2026-06-15 in the project ledgers for one `local_infer.py` run; the output file's hash was not recorded at the time |
+| UMUD, reproduction | public UMUD score 0.47473 | recorded on 2026-06-15 in the project ledgers for one run of the private inference script `local_infer.py`; the output file's hash was not recorded at the time |
 
 Developed with AI assistance; experiment choices, validation comparisons and the claims in these documents are the author's.

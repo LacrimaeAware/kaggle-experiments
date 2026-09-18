@@ -16,7 +16,7 @@ apo/MT knob is dead both ways: MT x0.95 lost hard (`0.53395`), and raising MT vi
 also lost (`0.47200`). Live leaderboard search is now one-dimensional: push the **fascicle**
 binarization threshold lower at apo 0.50.
 
-The reproducible one-run pipeline (`local_infer.py`, median FL) is still `0.47473`
+The reproducible one-run pipeline (one run of the private inference script `local_infer.py`, median FL) is still `0.47473`
 (`submission_reproduced.csv`). Older docs that say `0.52570`, `0.55075`, or `0.46041` as the best are
 stale.
 
@@ -95,7 +95,7 @@ from geometry; it came from fascicle thresholding. Practical rule:
 
 ## Per-term truth (code + LB + benchmark grounded)
 
-- **Benchmark with true scale, no recenter** (private benchmark scorer; `score_on_benchmark.py` scores the same benchmark with true scale): PA 0.1505 (below the
+- **Benchmark with true scale, no recenter** (scored by benchmark scorers kept in the private working repository; `benchmark_validate.py` here scores any submission CSV against the same 7-rater consensus and human floor): PA 0.1505 (below the
   0.2445 human floor), MT 0.0840 (at the 0.0810 floor), FL 0.5218 (floor 0.4026, over-reads +5.8 mm).
   This does **not** predict the leaderboard (min_extrap proved it again: benchmark 0.39, LB 0.49983).
 - **MT is a clean scale probe**: it has no fascicle and no extrapolation and is at the human floor with
