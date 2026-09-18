@@ -1,0 +1,36 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# Environments
+.venv/
+.venv*/
+env/
+venv/
+
+# Competition data, outputs and weights are never committed
+data/
+results/
+outputs/
+models/
+catboost_info/
+refs/
+*.csv
+*.parquet
+*.feather
+*.zip
+*.pt
+*.pth
+*.onnx
+*.h5
+*.npy
+*.npz
+*.pkl
+
+# Notebooks and their checkpoints
+*.ipynb
+.ipynb_checkpoints/
+
+# Credentials
+kaggle.json
+.kaggle/
