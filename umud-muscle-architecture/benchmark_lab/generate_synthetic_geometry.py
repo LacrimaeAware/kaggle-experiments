@@ -1,7 +1,7 @@
 """Generate synthetic band/strand geometry benchmarks with exact measurements.
 
-The output is intentionally abstract: two boundary bands, internal strands, a known pixel scale,
-and exact target measurements. This lets us test measurement rules without guessing hidden labels.
+Each case contains two boundary bands, internal strands, a known pixel scale
+and target measurements calculated from the generated coordinates.
 
 Example:
     python umud-muscle-architecture/benchmark_lab/generate_synthetic_geometry.py --n 24
@@ -21,7 +21,7 @@ import numpy as np
 
 try:
     from score_labels import measure_light
-except Exception:  # pragma: no cover - allows import help without cv2/numpy path weirdness.
+except Exception:  # Keep target generation available if the measurement helper fails to import.
     measure_light = None
 
 

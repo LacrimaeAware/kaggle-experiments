@@ -1,21 +1,12 @@
-"""Read the imaging scale off the ultrasound UI, the way a sonographer does: read the numbered side
-ruler and the printed depth label, and only trust the scale when two independent reads agree. Works
-on any image (no per-image lookup), and distinguishes 3.5 / 4.0 / 4.5 cm by actually reading them.
+"""Estimate ultrasound image scale from printed ruler numbers and depth labels.
 
-Two signals, independent failure modes:
-  1. RULER REGRESSION (primary). easyocr reads the side-ruler numbers and their pixel positions
-     (e.g. 0@y112, 2@y456, 3.5cm@y716). Regress value vs pixel-y; the slope IS px-per-unit, and the
-     R^2 of the fit is the confidence (collinear numbers -> trustworthy). Self-validating, and the
-     interval is measured, not assumed. Iterative outlier removal drops OCR misreads (a stray "24").
-  2. PRINTED DEPTH (cross-check). The "De 50 mm" / "3.5 cm" text block gives the total depth again,
-     independently. If it agrees with the ruler, we KNOW the scale. If not, we flag it.
+Ruler-number regression estimates pixels per unit. The printed depth provides
+a second cue; callers compare the two readings and inspect disagreements.
+OCR misreads are removed iteratively from the regression.
 
-read_scale(im) -> dict with px_per_mm, depth_mm, unit, r2, n, src, text_depth_mm. The caller decides
-trust from agreement, not from any single detector feeling sure (there are no test labels to check
-against, so independent-agreement is the only honest confidence).
-
-    python scale_ocr.py            # cross-check vs the tick detector on a spread of test images
-"""
+read_scale(im) returns px_per_mm, depth_mm, unit, r2, n, src and text_depth_mm.
+The example compares OCR readings with the tick detector:
+    python scale_ocr.py"""
 import re
 import sys
 from pathlib import Path
@@ -109,8 +100,7 @@ def read_scale(im, reader=None):
     toks, w, h = _tokens(im, reader)
     res = {"px_per_mm": None, "depth_mm": None, "unit": None, "r2": None, "n": 0,
            "src": None, "text_depth_mm": None, "depth_label_y": None}
-    # 1) numbered ruler regression: trust only a >=3-point collinear fit with a plausible depth.
-    #    Two points are trivially collinear (R^2=1 means nothing), so require 3+ real ruler labels.
+    # Require at least three ruler labels and a depth in the accepted range.
     best = None
     for side, on_edge in (("L", lambda cx: cx < 0.12 * w), ("R", lambda cx: cx > 0.88 * w)):
         edge = [(v, cy) for (v, hc, cx, cy, c, t) in toks if on_edge(cx) and v is not None and v <= 60]
@@ -174,13 +164,12 @@ def _depth_from_tick_scale_family(tick_px_per_cm, shape):
 
 
 def classify(im, cal, reader, min_conf):
-    """Return (tier, scale_px_per_cm, read_dict, note). Tiers, by how well we KNOW the scale:
-      verified       - ruler-number regression AND tick detector agree (two independent geometric reads)
-      text-confirmed - printed depth read, and consistent with the tick scale (depth-zero near the top)
-      ruler-only     - ruler regression, no tick to confirm
-      tick-only      - tick scale, no printed depth to confirm
-      flag           - printed depth and tick scale are INCONSISTENT (we know we don't know)
-      mean           - nothing readable
+    """Return (tier, scale_px_per_cm, read_dict, note), grouped by available cues.
+
+    verified: ruler-number regression agrees with tick spacing.
+    text-confirmed: tick spacing matches a printed depth or recorded device family.
+    ruler-only/tick-only: one accepted reading.
+    flag: conflicting readings. mean: no accepted reading.
     """
     s = read_scale(im, reader)
     h = im.shape[0]
@@ -234,7 +223,7 @@ def main():
             rows.append({"image_id": p.name, "tier": "error", "scale_px_per_cm": "", "ruler_px_cm": "",
                          "text_depth_mm": "", "tick_px_cm": "", "note": str(e)[:80]})
         tiers[tier] += 1
-        if (i + 1) % 10 == 0:                               # save EVERY 10 so a crash can't wipe progress
+        if (i + 1) % 10 == 0:                               # Save progress every ten images.
             pd.DataFrame(rows).to_csv(out, index=False)
             print(f"  {i+1}/{len(files)}  {dict(tiers)}", flush=True)
     pd.DataFrame(rows).to_csv(out, index=False)
@@ -244,7 +233,7 @@ def main():
     known = tiers["verified"] + tiers["text-confirmed"]
     for t in order:
         print(f"  {t:15} {tiers[t]:>3}  ({100*tiers[t]/n:.0f}%)")
-    print(f"\n  KNOW the scale (verified + text-confirmed): {known}/{n} = {100*known/n:.0f}%")
+    print(f"\n  Cue agreement or family/depth match: {known}/{n} = {100*known/n:.0f}%")
     print(f"  wrote per-image partition -> {out}")
 
 

@@ -1,13 +1,8 @@
-"""Local scoreboard against the OSF expert benchmark (35 measured images). CPU only, no GPU.
+"""Score PA, FL and MT predictions against the 35-image OSF expert benchmark.
 
-Scores PA/FL/MT predictions with the competition's own metric (tolerance-normalized MAE) against
-the 7-expert consensus, so any change can be measured on the desktop in seconds instead of by a
-Kaggle submission. Prints the human floor, DL-Track, and SMA references alongside.
-
-CAVEAT (see benchmark_findings.md): these 35 images are DIFFERENT devices than the Kaggle test set.
-This validates the measurement LOGIC and the metric, and - where our model runs on these images -
-cross-device generalization. It is NOT a stand-in for the Kaggle devices, and the benchmark's tick
-convention (1 cm) does not transfer (Kaggle PNGs read as ~5 mm against their depth text).
+Reports tolerance-normalized errors against the seven-rater consensus, expert
+disagreement, and DL-Track and SMA reference scores. The benchmark uses different
+ultrasound devices from the competition test set; its ruler spacing is 1 cm.
 
 Usage:
     python benchmark_validate.py                 # references + our constant-prior baseline
@@ -81,7 +76,7 @@ def load_truth(use_robust: bool = True):
         out[col + "_dlt"] = df[f"DLTrack_{suf}"]
         out[col + "_sma"] = df[f"SMA_{suf}"]
     floor = {}
-    for col, suf in TGT.items():  # human floor: each expert vs the mean of the rest, nan-robust
+    for col, suf in TGT.items():  # expert disagreement: each rater vs the mean of the rest, nan-robust
         X = (clean[suf] if use_robust else df[[f"{r}_{suf}" for r in R]].astype(float)).values
         errs = []
         for j in range(len(R)):
@@ -124,7 +119,7 @@ def main():
             print(f"  {item['ImageID']} {item['suffix']} {item['rater']}={item['value']:.2f} "
                   f"raw_mean {item['raw_mean']:.2f} -> {item['robust_mean']:.2f}")
     print("\nreferences (tol-normalized MAE vs expert consensus; lower is better):")
-    print(f"  human floor (expert vs the rest): {np.mean([floor[c]/TOL[c] for c in TGT]):.3f}")
+    print(f"  expert disagreement (each vs rest): {np.mean([floor[c]/TOL[c] for c in TGT]):.3f}")
     print(f"  DL-Track (correct scale):         {_tool_score(truth, '_dlt'):.3f}")
     print(f"  SMA:                              {_tool_score(truth, '_sma'):.3f}")
 

@@ -1,8 +1,6 @@
-"""Robust consensus helpers for the 35-image expert benchmark.
+"""Consensus helpers for the 35-image expert benchmark.
 
-The source spreadsheet is left untouched. These helpers only affect local
-benchmark scoring/viewing by dropping a single obvious rater tail when the
-remaining raters form a tight cluster.
+Drop at most one outlying rater value when the other values form a tight cluster.
 """
 
 from __future__ import annotations
@@ -50,8 +48,7 @@ def robust_mean(
 
     A value is dropped only if it is at least two competition tolerances away
     from the other-rater mean and the other raters span no more than two
-    tolerances. This catches the clear spreadsheet pathologies without
-    rewriting broad expert disagreement as if it were a typo.
+    tolerances.
     """
 
     tol = TOL_BY_SUFFIX[metric_suffix]

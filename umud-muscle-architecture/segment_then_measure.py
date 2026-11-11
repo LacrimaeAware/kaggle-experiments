@@ -1,20 +1,13 @@
-"""UMUD segment-then-measure: train aponeurosis/fascicle U-Nets, predict on the test
-images, measure geometry, write a submission.
+"""UMUD segmentation followed by geometric measurement.
 
-Designed to run unchanged on a Kaggle GPU notebook (the clean path, free CUDA) or
-locally. It auto-discovers the data folders wherever they are mounted (Kaggle slug
-paths and extra wrapper folders vary, so nothing is hard-coded) and picks the device.
-On Kaggle: Add Input -> attach the competition, enable GPU and Internet, then run.
+Train aponeurosis and fascicle U-Nets, predict masks, recover ruler scale,
+fit lines and write PA/FL/MT measurements. Data folders are discovered under
+local data/ or mounted Kaggle inputs. Training requires the competition data;
+inference requires the saved checkpoints.
 
-Pipeline:
-    test image -> apo U-Net + fascicle U-Net -> binary masks -> fit lines -> PA, FL_px, MT_px
-Submission for this first version: pennation angle from the segmentation geometry,
-fascicle length and thickness from the prior (calibration is the next step).
-
-Env knobs (optional):
-    UMUD_EPOCHS=2      fast smoke run (default 12)
-    UMUD_MAX_PAIRS=24  cap training pairs for a quick local test (default 0 = all)
-"""
+Example training settings:
+    UMUD_EPOCHS=2      two epochs (default 12)
+    UMUD_MAX_PAIRS=24  limit training pairs (default 0 = all)"""
 
 import os
 os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")  # quiet libtiff ImageJ-tag warns (set before cv2 import)
@@ -52,9 +45,7 @@ except ImportError:
     import albumentations as A
     from albumentations.pytorch import ToTensorV2
 
-# Quiet OpenCV's per-image libtiff warnings: these images carry ImageJ private tags
-# (50838/50839) that libtiff does not recognize. The pixels decode fine; only the log
-# is affected. Suppressing keeps the training output readable.
+# Suppress libtiff warnings about ImageJ tags 50838 and 50839.
 try:
     cv2.setLogLevel(getattr(cv2, "LOG_LEVEL_ERROR", 2))
 except Exception:
@@ -93,43 +84,41 @@ WEIGHTS_TAG = os.environ.get("UMUD_WEIGHTS_TAG", "").strip()
 SEED = 42
 EPOCHS = int(os.environ.get("UMUD_EPOCHS", "12"))      # UMUD_EPOCHS=2 for a fast smoke run
 MAX_PAIRS = int(os.environ.get("UMUD_MAX_PAIRS", "0"))  # >0 caps train pairs (local smoke tests)
-PRIOR = {"fl_mm": 81.866, "mt_mm": 18.628, "pa_deg": 15.105}  # fl raised from 74.424: the recenter pinned FL ~10% too low; LB-confirmed via the FL x1.10 win (2026-06-14)
-PA_SHIFT = float(os.environ.get("UMUD_PA_SHIFT", "2.5"))  # global PA correction: model under-reads PA ~2.5 deg on the domain-shifted test set (LB-confirmed 2026-06-14)
+PRIOR = {"fl_mm": 81.866, "mt_mm": 18.628, "pa_deg": 15.105}  # Default calibration means; FL was revised from 74.424 mm.
+PA_SHIFT = float(os.environ.get("UMUD_PA_SHIFT", "2.5"))  # Angle shift applied by the threshold-sweep generator.
 PA_MIN, PA_MAX = 5.0, 45.0  # competition physiological range for pennation angle
 FL_MIN, FL_MAX = 30.0, 200.0
 MT_MIN, MT_MAX = 10.0, 50.0
 USE_CALIBRATED_MT = os.environ.get("UMUD_USE_CALIBRATED_MT", "1") != "0"
 USE_CALIBRATED_FL = os.environ.get("UMUD_USE_CALIBRATED_FL", "0") == "1"
-USE_SCALE_ROUTER = os.environ.get("UMUD_SCALE_ROUTER", "1") != "0"  # validated per-family scale (295/309 = 95% coverage; the old "54%" comment was stale)
+USE_SCALE_ROUTER = os.environ.get("UMUD_SCALE_ROUTER", "1") != "0"  # Device-specific ruler readers; recorded coverage 295/309 images.
 USE_IDENTITY_FL = os.environ.get("UMUD_USE_IDENTITY_FL", "1") != "0"  # FL = MT/sin(PA), fallback when no fragment
-USE_FRAGMENT_FL = os.environ.get("UMUD_FRAGMENT_FL", "1") != "0"  # FL from fascicle fragment extrapolated to apo lines; beats identity once apo inner-edge is fixed (0.481->0.353 on the 35 experts)
-FL_IDENTITY_BLEND = float(os.environ.get("UMUD_FL_IDENTITY_BLEND", "0"))  # keep fragment-only FL by default; blend=.5 looked better locally but regressed public LB 0.61918->~0.64
+USE_FRAGMENT_FL = os.environ.get("UMUD_FRAGMENT_FL", "1") != "0"  # Extrapolate accepted fascicle fragments to the aponeurosis lines.
+FL_IDENTITY_BLEND = float(os.environ.get("UMUD_FL_IDENTITY_BLEND", "0"))  # Blend fragment length with MT/sin(PA); 0 uses fragment length.
 FL_FRAGMENT_MODE = os.environ.get("UMUD_FL_FRAGMENT_MODE", "median").lower()  # median | min_extrap_top3 | visibility_weighted
-# min_extrap_top3 looked far better on the benchmark (FL 0.52->0.39) but REGRESSED the LB
-# (median-clean 0.47473 -> min_extrap 0.49983, 2026-06-15). The benchmark distribution does not
-# transfer to test. median is the LB-confirmed default; do not re-flip without a TEST-set gate.
+# On 2026-06-15, min_extrap_top3 scored 0.49983 publicly versus 0.47473 for median.
 FL_FRAGMENT_TOPK = int(os.environ.get("UMUD_FL_FRAGMENT_TOPK", "3"))  # host protocol uses 3 manually selected low-extrapolation structures
-USE_FL_FACING = os.environ.get("UMUD_FL_FACING", "0") == "1"  # opt-in rejected probe: consensus angle + facing-parabola apo + minimize-extrapolation. It improved the 35-expert FL proxy but regressed public LB 0.61918->0.66459, so keep the safe fragment-FL baseline as default.
-USE_FL_RECENTER = os.environ.get("UMUD_FL_RECENTER", "1") != "0"  # CORRECTED 2026-06-14: this is NOT a no-op and does NOT mask an overshoot. On the live pipeline raw FL mean is ~91.6mm; pinning to PRIOR=74.424 multiplies every FL by ~0.81 (a ~19% SHRINK, 308/309 rows). The LB proves FL must be LONGER (FL x1.05 -> 0.52570 best). So the recenter actively shortens FL the wrong way. The fix is to raise PRIOR['fl_mm'] toward the LB optimum or set this OFF; see docs/CURRENT_STATE.md. (Old "0/309 no-op" claim came from re-applying the pin to an already-pinned file.)
+USE_FL_FACING = os.environ.get("UMUD_FL_FACING", "0") == "1"  # Optional consensus-angle and curved-boundary length estimate.
+USE_FL_RECENTER = os.environ.get("UMUD_FL_RECENTER", "1") != "0"  # Scale the predicted FL mean to PRIOR['fl_mm'], then clip.
 USE_TTA = os.environ.get("UMUD_TTA", "1") != "0"  # mirror+scale test-time aug; denoises masks (exp08: 0.383->0.370)
 FASC_MIN_AREA = int(os.environ.get("UMUD_FASC_MIN_AREA", "40"))   # drop tiniest fragments (exp09)
 FASC_MIN_ANG = float(os.environ.get("UMUD_FASC_MIN_ANG", "6"))    # reject apo-parallel fragments (exp07/09: PA 0.171->0.164)
 USE_APO_INNER = os.environ.get("UMUD_APO_INNER", "1") != "0"      # measure MT between bands' muscle-facing INNER edges, not centroids (exp14: MT-term 0.49->0.18)
-USE_BAND_FIX = os.environ.get("UMUD_BAND_FIX", "1") != "0"        # pick the apo pair the fascicles sit between (not just the 2 largest blobs) AND drop fragments outside the band. 2026-06-14 review: 56/309 images had fascicle fragments above the superficial or below the deep aponeurosis (9% of all kept fragments); some picked the wrong band entirely.
-USE_POS_WEIGHT = os.environ.get("UMUD_POS_WEIGHT", "0") == "1"    # weight fascicle fragments by position in the band: the stable fascicles run through the MIDDLE, near-aponeurosis structures (grooved artifacts, esp. near the DEEP band) are unreliable. Gaussian weight peaked above mid-band. (2026-06-14 user review)
+USE_BAND_FIX = os.environ.get("UMUD_BAND_FIX", "1") != "0"        # Select the aponeurosis pair around the fascicles and reject out-of-band fragments.
+USE_POS_WEIGHT = os.environ.get("UMUD_POS_WEIGHT", "0") == "1"    # Weight fragments by their position within the muscle band.
 POS_CENTER = float(os.environ.get("UMUD_POS_CENTER", "0.45"))     # 0 = at superficial inner edge, 1 = at deep inner edge
 POS_WIDTH = float(os.environ.get("UMUD_POS_WIDTH", "0.30"))
-USE_ELONG_FILTER = os.environ.get("UMUD_ELONG_FILTER", "0") == "1"  # reject thick low-elongation blobs (grooved near-aponeurosis artifacts); real fascicles are thin and elongated. (2026-06-14 user review)
+USE_ELONG_FILTER = os.environ.get("UMUD_ELONG_FILTER", "0") == "1"  # Reject components whose elongation is below ELONG_MIN.
 ELONG_MIN = float(os.environ.get("UMUD_ELONG_MIN", "3.0"))         # min ratio of major-axis std to minor-axis std for a component to count as a fascicle
 TOP_BOUNDARY_MODE = os.environ.get("UMUD_TOP_BOUNDARY_MODE", "line").lower()  # line | triangle | robust_triangle; opt-in upper-boundary shape candidate
 MT_MODE = os.environ.get("UMUD_MT_MODE", "perp_center").lower()    # perp_center | vertical_3 (host straight-line left/mid/right approximation)
-USE_CURVED_APO = os.environ.get("UMUD_CURVED_APO", "0") == "1"     # ROUTED (not global): for images whose DEEP apo a straight line fits poorly (residual >= CURVED_APO_RESID px), fit the deep inner edge as a parabola and measure PA vs its local tangent + MT vs its local position. Straight images (the ~71% below threshold) are byte-identical. Targets the curved-deep-apo family (29% of test, 2026-07-01 stratification).
+USE_CURVED_APO = os.environ.get("UMUD_CURVED_APO", "0") == "1"     # Fit a curved deep boundary when its line-fit residual reaches CURVED_APO_RESID.
 CURVED_APO_RESID = float(os.environ.get("UMUD_CURVED_APO_RESID", "4.0"))  # px RMS of the deep inner edge from its straight-line fit, above which the image is treated as curved
 FASC_POS_WEIGHT = float(os.environ.get("UMUD_FASC_POS_WEIGHT", "0"))  # >0 biases fascicle BCE toward recall (Kaggle retrain only)
 USE_CLAHE = os.environ.get("UMUD_CLAHE", "0") == "1"  # CLAHE contrast-normalize input; surfaces more fragments but MUST retrain both models with it on (exp10)
 USE_TEMPORAL_SMOOTH = os.environ.get("UMUD_TEMPORAL_SMOOTH", "0") == "1"  # median-smooth within sequence clips (exp02); off by default
 SCALE_OVERRIDE_CSV = os.environ.get("UMUD_SCALE_OVERRIDE_CSV", "").strip()  # optional image_id -> px/cm overrides from human scale review
-PIPELINE_VERSION = "2026-06-14.01"  # bump on every pipeline change; printed at run start so the version is verifiable
+PIPELINE_VERSION = "2026-06-14.01"  # Reported at run start.
 CALIBRATION_MIN_CONF = float(os.environ.get("UMUD_CALIBRATION_MIN_CONF", "0.3"))  # router gates per-method internally (png/644/right>=0.5, bottom>=0.9, faint-left>=0.30)
 IMG_EXTS = (".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp")
 
@@ -357,10 +346,7 @@ def tf(train):
                 ], p=0.18),
             ]
         elif AUG_LEVEL == "ood":
-            # Domain-generalization for the OUT-OF-DISTRIBUTION test set (test->train fingerprint match
-            # 0.739 vs 0.970 train->train, docs/TEST_GATE_FINDINGS.md 2026-07-01d). Simulate unseen
-            # ULTRASOUND DEVICES: gain/dynamic-range, gamma/tone, speckle, probe resolution. Params are
-            # kept to the spelling stable across albumentations 1.x and 2.x (no scale_min/var_limit/etc).
+            # Vary contrast, tone, noise and blur to explore device differences.
             aug += [
                 A.ShiftScaleRotate(shift_limit=0.06, scale_limit=0.20, rotate_limit=18,
                                    border_mode=cv2.BORDER_REFLECT_101, p=0.60),
@@ -547,7 +533,7 @@ def train_segmenter(target, epochs=12, bs=None):
     opt = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(epochs, 1))
     bce = nn.BCEWithLogitsLoss()
-    if target == "fasc" and FASC_POS_WEIGHT > 0:  # idea-2: counter dash sparsity, push fascicle recall
+    if target == "fasc" and FASC_POS_WEIGHT > 0:  # Increase the BCE weight of fascicle pixels.
         bce = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(FASC_POS_WEIGHT, device=DEVICE))
         print(f"[{target}] using pos_weight={FASC_POS_WEIGHT} on BCE (recall bias)", flush=True)
     scaler = torch.amp.GradScaler("cuda", enabled=USE_AMP)
@@ -654,7 +640,7 @@ def fit_line(ys, xs):
 
 
 def pca_line(ys, xs):
-    """Total-least-squares line (slope, intercept); unbiased for steep fascicles, unlike polyfit (exp05)."""
+    """Fit a total-least-squares line and return its slope and intercept."""
     xs = np.asarray(xs, np.float64)
     ys = np.asarray(ys, np.float64)
     xc, yc = xs.mean(), ys.mean()
@@ -799,11 +785,12 @@ def isect_par(cs, b, par, xref):
 
 
 def compute_facing_fl(used, sup, deep, sup_edges, deep_edges):
-    """FL = median facing-parabola span over the minimize-extrapolation fragments, all cast at the
-    single consensus angle (parallel, non-crossing). The parabolic apo is kept only where it bows
-    toward the muscle (gap cannot diverge off-frame); otherwise the straight apo line is used. Visual-
-    review validated on the 35 experts (raw FL 6.4mm->2.5mm, bias +6.0->0) and generalization-checked
-    on 220 training muscles (identical behaviour, 0 haywire). Returns FL in px, or None."""
+    """Estimate FL from fragments projected at a shared consensus angle.
+
+    Use parabolic aponeuroses where their curvature narrows the extrapolated gap;
+    otherwise use straight boundaries. Return the median accepted span in pixels,
+    or None when no valid span remains.
+    """
     if not used:
         return None
     sup_par = deep_par = None
@@ -873,10 +860,8 @@ def aggregate_fragment_fl(fragment_rows):
 def measure(apo_mask, fasc_mask, return_geometry=False):
     """Return PA plus pixel-space FL/MT geometry, or None if aponeurosis geometry fails.
 
-    With return_geometry=True the result also carries a "geometry" dict with the exact per-image
-    objects this function uses (sup/deep apo lines, top_boundary, MT segments, and every detected
-    fascicle fragment with its fitted slope/angle/area/endpoints). This is the production-faithful
-    pre-fill source for the correction UI; the default return is unchanged."""
+    With return_geometry=True, include aponeurosis lines, thickness segments and
+    detected fragment fits in a geometry dictionary."""
     apo_mask = np.ascontiguousarray(apo_mask, np.uint8)
     fasc_mask = np.ascontiguousarray(fasc_mask, np.uint8)
     n, lab, stats, _ = cv2.connectedComponentsWithStats(apo_mask, connectivity=8)
@@ -884,9 +869,7 @@ def measure(apo_mask, fasc_mask, return_geometry=False):
     if len(comp) < 2:
         return None
     if USE_BAND_FIX:
-        # Consider every reasonably sized aponeurosis band, then pick the adjacent PAIR that the
-        # fascicle fragments actually sit between, instead of blindly taking the two largest blobs
-        # (the two-largest rule chose the wrong pair on the 3-band images: 121-125, 71-75, etc.).
+        # Select the adjacent aponeurosis bands containing the most fascicle centroids.
         big = [i for area, i in comp if area >= max(150, comp[0][0] * 0.10)]
         if len(big) < 2:
             big = [i for _, i in comp[:2]]
@@ -975,7 +958,7 @@ def measure(apo_mask, fasc_mask, return_geometry=False):
         ys, xs = np.where(labf == i)
         if len(xs) < 8:
             continue
-        fs, fb = pca_line(ys, xs)  # unbiased fascicle orientation (exp05)
+        fs, fb = pca_line(ys, xs)  # Principal-component orientation.
         cxm, cym = float(np.mean(xs)), float(np.mean(ys))
         fasc = (fs, fb)
         lower = deep_hit(fasc, cxm)                     # foot on the deep apo (curve-aware; straight -> line intersection)
@@ -1001,12 +984,12 @@ def measure(apo_mask, fasc_mask, return_geometry=False):
             fl = float(np.hypot(upper[0] - lower[0], upper[1] - lower[1]))
         visible_len = fragment_visible_length(xs, ys, fs)
         pw = 1.0
-        if USE_POS_WEIGHT:  # downweight near-aponeurosis fragments (deep edge worst); trust the mid-band
+        if USE_POS_WEIGHT:  # Gaussian weight by position within the band.
             sy1, dy1 = line_y(superficial, cxm), deep_y_at(cxm)
             if abs(dy1 - sy1) > 1e-6:
                 pos = (cym - sy1) / (dy1 - sy1)
                 pw = float(np.exp(-((pos - POS_CENTER) / POS_WIDTH) ** 2))
-        kept = reject_reason is None  # same accepted set as before: band + elong + angle all pass
+        kept = reject_reason is None  # Band, elongation and angle filters all pass.
         if kept:
             angs.append(a)
             wts.append(area * pw)  # weight by fragment size (exp05) and band position (2026-06-14)
@@ -1036,7 +1019,7 @@ def measure(apo_mask, fasc_mask, return_geometry=False):
             })
     pa_deg = weighted_median(angs, wts) if angs else None
     fl_fragment_px, fl_fragment_median_px, fl_fragment_n = aggregate_fragment_fl(fragment_rows)
-    if USE_POS_WEIGHT and fragment_rows:  # FL from the trusted mid-band fragments (less extrapolation)
+    if USE_POS_WEIGHT and fragment_rows:  # FL weighted by fragment area and band position.
         valid = [r for r in fragment_rows if 10.0 <= r["fl"] <= 4000.0]
         if valid:
             fl_fragment_px = float(weighted_median([r["fl"] for r in valid],
@@ -1178,9 +1161,10 @@ def fingerprint(image_rgb):
 
 
 def temporal_smooth(sub, fps, thresh=0.92, max_len=12):
-    """Median-smooth PA/FL/MT within runs of consecutive highly-similar frames (the test set's clip
-    structure, not labels - a legitimate variance reduction; exp02 found ~112/308 consecutive pairs
-    >0.9 similar). Clips longer than max_len are left alone (likely a mis-grouping)."""
+    """Median-smooth PA/FL/MT within groups of similar consecutive frames.
+
+    Groups of 2 to max_len frames are selected by the similarity threshold.
+    """
     fps = np.asarray(fps, np.float32)
     sim = (fps[:-1] * fps[1:]).sum(axis=1)        # consecutive cosine similarity (fps are unit norm)
     clip = np.zeros(len(fps), int)
@@ -1210,7 +1194,7 @@ def main():
           flush=True)
     print(f"      target_modes apo={APO_TARGET_MODE} fasc={FASC_TARGET_MODE} auto_threshold={AUTO_THRESHOLD} "
           f"fasc_postprocess={FASC_POSTPROCESS} save_pred_debug={SAVE_PRED_DEBUG}", flush=True)
-    print("      (old code would NOT print this line - if you don't see VERSION, re-run the wget cell)\n", flush=True)
+    print()
     test_dir = DIRS["test"]
     test_files = sorted(p for p in test_dir.iterdir() if p.is_file() and p.suffix.lower() in IMG_EXTS)
     print(f"test images: {len(test_files)} (from {test_dir})", flush=True)
@@ -1241,7 +1225,7 @@ def main():
                 cv2.imwrite(str(debug_dir / f"{p.stem}_apo.png"), (apo_mask * 255).astype(np.uint8))
                 cv2.imwrite(str(debug_dir / f"{p.stem}_fasc.png"), (fasc_mask * 255).astype(np.uint8))
             geom = measure(apo_mask, fasc_mask)
-        except Exception as e:  # no single image can abort the 309-row submission
+        except Exception as e:  # Use priors when measurement fails on an image.
             print(f"  measure failed on {p.name}: {e}", flush=True)
             geom = None
         pa = geom["pa_deg"] if geom else None
@@ -1268,9 +1252,7 @@ def main():
             if USE_CALIBRATED_FL and geom["fl_px"] is not None:
                 fl_mm = float(np.clip(geom["fl_px"] / px_per_mm, FL_MIN, FL_MAX))
                 fl_ok += 1
-        # FL: prefer fascicle-fragment extrapolation to the apo lines where we have scale + a fragment
-        # (best on the 35 experts once the apo inner-edge fix is in: 0.481->0.353, vs DL-Track 0.312).
-        # Else the MT/sin(PA) identity (needs a measured PA), else the prior constant.
+        # Use scaled fragment length, then MT/sin(PA), then the prior constant.
         if USE_FRAGMENT_FL and px_per_mm and geom is not None and geom.get("fl_px"):
             fl_mm = float(np.clip(geom["fl_px"] / px_per_mm, FL_MIN, FL_MAX))
             fl_ok += 1
@@ -1301,7 +1283,7 @@ def main():
         rows.append({"image_id": p.name, "pa_deg": round(pa, 3),
                      "fl_mm": round(fl_mm, 3), "mt_mm": round(mt_mm, 3)})
     sub = pd.DataFrame(rows)
-    if USE_FL_RECENTER and (USE_FRAGMENT_FL or USE_IDENTITY_FL) and sub["fl_mm"].mean() > 0:  # pin FL mean to the prior (UMUD_FL_RECENTER=0 to keep honest per-image FL)
+    if USE_FL_RECENTER and (USE_FRAGMENT_FL or USE_IDENTITY_FL) and sub["fl_mm"].mean() > 0:  # pin FL mean to the prior (UMUD_FL_RECENTER=0 to keep per-image FL without recentering)
         sub["fl_mm"] = (sub["fl_mm"] * (PRIOR["fl_mm"] / sub["fl_mm"].mean())).clip(FL_MIN, FL_MAX).round(3)
     if USE_TEMPORAL_SMOOTH:  # variance reduction within sequence clips (off by default)
         sub = temporal_smooth(sub, fps)

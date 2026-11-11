@@ -2,7 +2,7 @@
 
 ## Question
 
-Whether the recipe described by top public entries (a diverse base-model zoo, a balanced-logistic meta-model stacked on out-of-fold class log-probabilities, then per-class threshold calibration, under nested cross-validation) beats the single-LightGBM first attempt (out-of-fold balanced accuracy 0.9640, public leaderboard 0.96523).
+Whether a five-model tree ensemble with a balanced logistic meta-model and threshold calibration improves on the single-LightGBM first attempt (out-of-fold balanced accuracy 0.9640, public leaderboard 0.96523).
 
 ## Setup
 
@@ -10,8 +10,7 @@ Whether the recipe described by top public entries (a diverse base-model zoo, a 
 - Base zoo: balanced LightGBM (500 trees), an unbalanced LightGBM (700 trees, different params, for diversity), XGBoost (balanced via sample weights), CatBoost (balanced), HistGradientBoosting (balanced). The two categoricals were ordinal-encoded into a single numeric matrix shared by all bases.
 - Stack: features are the concatenated log-probabilities of each base's out-of-fold predictions; meta-model is LogisticRegression(class_weight=balanced).
 - Threshold calibration: differential evolution over three per-class multipliers (bounds 0.1 to 5), maximizing balanced accuracy.
-- Nesting: base out-of-fold via the fold CV; the meta-model fit via CV over the stack features; the thresholds fit on disjoint out-of-fold rows. The final output file fits meta and thresholds on all out-of-fold rows and applies them to the test set.
-- Omits the neural-tabular base models (RealMLP, TabM) that top entries use, which need a GPU.
+- Validation: base out-of-fold via the fold CV; the meta-model fit via CV over the stack features; the thresholds fit on disjoint out-of-fold rows. The final output file fits meta and thresholds on all out-of-fold rows and applies them to the test set.
 - Code: experiments6.py.
 
 ## Results
@@ -33,16 +32,16 @@ Public leaderboard: a score of 0.96659 for this stack was recorded in the projec
 
 ## Findings
 
-1. The stack reached 0.96596 out-of-fold, +0.00196 over the first attempt, well above the 0.0002 seed-to-seed noise floor measured in experiment 02.
-2. Most of that gain was not the ensemble. A single balanced LightGBM with 500 fixed trees scored 0.96518, about +0.0012 over the first attempt's ~1700 early-stopped trees. The first attempt slightly overfit on tree count, consistent with experiment 02, where added capacity hurt. The 5-model stack added a further +0.0008 over that best single base.
-3. Threshold calibration added nothing (0.96596 to 0.96591; near-uniform weights). The base models already use balanced class weights, so the decision boundary is pre-aligned to balanced accuracy. Calibration matters when the base models are trained on log-loss and left unbalanced, which over-predict the majority class; here it is redundant.
+1. The stack reached 0.96596 out-of-fold, +0.00196 over the first attempt.
+2. The revised balanced LightGBM scored 0.96518, about +0.0012 over the first attempt. It used 500 fixed trees and ordinal-encoded categories. The five-model stack added a further +0.0008.
+3. Threshold calibration changed the score from 0.96596 to 0.96591, with near-uniform weights.
 4. CatBoost (0.95682) and the unbalanced LightGBM (0.95469) were the weak bases. The balanced LightGBM, HistGradientBoosting, and XGBoost cluster at 0.964 to 0.965.
-5. Top public entries, as described in forum posts read during the competition, add neural-tabular base models that need a GPU; those were omitted here. The forum figures are not reproduced in this note because the posts were not recorded as sources.
+
 
 ## Caveats
 
 - The categoricals were ordinal-encoded into a single numeric matrix for all bases, a minor simplification versus native categorical handling, applied consistently.
-- This is one configuration per base model, not a tuning sweep. The point was the stacking recipe, not squeezing each base.
+- Each base model used one configuration.
 
 ## Outputs
 

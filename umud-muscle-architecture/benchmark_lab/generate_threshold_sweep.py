@@ -1,14 +1,11 @@
-"""Mask-threshold sweep in ONE model pass (probability maps computed once per image, then binarized at
-each threshold - free). The threshold is where the segmentation draws the aponeurosis line and which
-fascicles it keeps, i.e. WHERE THE LINES SIT and WHICH FASCICLES EXIST - the actual wall - tunable
-without any retrain. This is the first batch of the sustained leaderboard grind (deadline is months out;
-we have hundreds of submissions over time, so search, keep winners).
+"""Sweep aponeurosis and fascicle thresholds using cached probability maps.
 
-3x3 grid of (apo_threshold, fasc_threshold). (0.50, 0.50) reproduces the baseline. Each written at the
-0.46041 lineage (FL recenter + FL x1.05) to results/submission_thr_a{a}_f{f}.csv.
+One model pass per image supplies the maps for all threshold pairs. Outputs use
+the 0.46041 processing lineage (FL recentering and FL x1.05) and are written to
+results/submission_thr_a{a}_f{f}.csv. Set UMUD_APO_THRS and UMUD_FASC_THRS to
+choose the threshold grids.
 
-    python umud-muscle-architecture/benchmark_lab/generate_threshold_sweep.py
-"""
+    python umud-muscle-architecture/benchmark_lab/generate_threshold_sweep.py"""
 import os
 import sys
 import time
@@ -76,7 +73,7 @@ def main():
         if (i + 1) % 60 == 0:
             print(f"  {i+1}/{len(files)} ({time.time()-t0:.0f}s)", flush=True)
 
-    # write ALL submissions FIRST so a reporting bug can never lose the compute
+    # Write all submission files before printing comparisons.
     subs = {}
     for a, f in combos:
         sub = finalize(rows[(a, f)])
@@ -91,7 +88,7 @@ def main():
         d = int((~np.isclose(sub.pa_deg, base.pa_deg) | ~np.isclose(sub.fl_mm, base.fl_mm) | ~np.isclose(sub.mt_mm, base.mt_mm)).sum())
         tag = "  <- ref" if (a, f) == base_key else ""
         print(f"  {a:>5.2f}{f:>6.2f}{sub.pa_deg.mean():>8.2f}{sub.fl_mm.mean():>8.2f}{sub.mt_mm.mean():>8.2f}{d:>13}   submission_thr_a{a:.2f}_f{f:.2f}.csv{tag}")
-    print("\n  descriptive. Submit across days, keep winners, iterate.")
+    print()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Source notes · Kaggle experiments</title><meta name="description" content="Kaggle projects for learning classification, image measurement and game-agent techniques."><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#content">Skip to the study</a><header class="wrap mast"><a class="brand" href="index.html">Kaggle experiments</a><nav aria-label="Studies"><a href="index.html">Overview</a><a href="stellar.html">Stellar classes</a><a href="ultrasound.html">Ultrasound</a></nav></header><main class="wrap" id="content"><header class="source-intro"><h1>Sources and notes</h1><p>Data, validation, result records and selected code from the stellar and ultrasound experiments.</p></header><section class="source-section" id="stellar"><h2>Stellar classification</h2><p>The full-data baseline and stack used five stratified folds, seed 42 and 577,347 training rows. Earlier screens used stratified subsamples.</p><div class="table-wrap" tabindex="0" role="region" aria-label="Stellar public-score records"><table><caption>Public-score records</caption><thead><tr><th scope="col">Result</th><th scope="col">Record</th></tr></thead><tbody><tr><th scope="row">Baseline · 0.96523</th><td>Submission recorded on 8 June 2026; the file hash was not recorded.</td></tr><tr><th scope="row">Stack · 0.96659</th><td>Ledger entry without a kept submission record. The same-day experiment note lists its output as not submitted.</td></tr></tbody></table></div><details><summary>Five-fold model comparison: run_cv</summary><pre><code>def run_cv(cfg, X, y, X_test, classes):
+    &quot;&quot;&quot;StratifiedKFold CV. Returns OOF probabilities, mean test probabilities,
+    and the out-of-fold balanced accuracy.&quot;&quot;&quot;
+    n_class = len(classes)
+    oof = np.zeros((len(X), n_class))
+    test_pred = np.zeros((len(X_test), n_class))
+
+    skf = StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed)
+    for fold, (tr_idx, va_idx) in enumerate(skf.split(X, y), 1):
+        X_tr, X_va = X.iloc[tr_idx], X.iloc[va_idx]
+        y_tr, y_va = y[tr_idx], y[va_idx]
+
+        model = lgb.LGBMClassifier(**cfg.params)
+        model.fit(
+            X_tr, y_tr,
+            eval_set=[(X_va, y_va)],
+            eval_metric=&quot;multi_logloss&quot;,
+            callbacks=[lgb.early_stopping(100, verbose=False), lgb.log_evaluation(0)],
+        )
+        oof[va_idx] = model.predict_proba(X_va)
+        test_pred += model.predict_proba(X_test) / cfg.n_folds
+        fold_score = balanced_accuracy_score(y_va, oof[va_idx].argmax(1))
+        print(f&quot;fold {fold}: balanced accuracy {fold_score:.4f} &quot;
+              f&quot;(best_iter {model.best_iteration_})&quot;)
+
+    oof_score = balanced_accuracy_score(y, oof.argmax(1))
+    print(f&quot;OOF balanced accuracy: {oof_score:.4f}&quot;)
+    return oof, test_pred, oof_score</code></pre></details><p><a href="https://www.kaggle.com/competitions/playground-series-s6e6">Stellar classification competition</a></p></section><section class="source-section" id="ultrasound"><h2>Ultrasound measurements</h2>
+<p><a href="https://www.kaggle.com/competitions/umud-challenge-muscle-architecture-in-ultrasound-data/overview/description">UMUD competition and measurement definitions</a></p><p>The best file was <code>submission_thr_a0.50_f0.30.csv</code> (309 rows), recorded 1 July 2026. Its command was reconstructed from the script and filename; its Kaggle upload was not independently confirmed. The documented median-length pipeline scored 0.47473 on 15 June 2026.</p><details><summary>Local metric: umud_score</summary><pre><code>def umud_score(
+    solution: pd.DataFrame,
+    submission: pd.DataFrame,
+    row_id_column_name: str = &quot;image_id&quot;,
+) -&gt; float:
+    &quot;&quot;&quot;Compute the UMUD Score, lower is better.&quot;&quot;&quot;
+    if row_id_column_name not in solution.columns:
+        raise MetricInputError(f&quot;Solution is missing &#x27;{row_id_column_name}&#x27;.&quot;)
+    if row_id_column_name not in submission.columns:
+        raise MetricInputError(f&quot;Submission is missing &#x27;{row_id_column_name}&#x27;.&quot;)
+
+    for col in TARGET_COLUMNS:
+        if col not in solution.columns:
+            raise MetricInputError(f&quot;Solution is missing &#x27;{col}&#x27;.&quot;)
+        if col not in submission.columns:
+            raise MetricInputError(f&quot;Submission is missing &#x27;{col}&#x27;.&quot;)
+
+    if solution[row_id_column_name].duplicated().any():
+        raise MetricInputError(&quot;Solution contains duplicate IDs.&quot;)
+    if submission[row_id_column_name].duplicated().any():
+        raise MetricInputError(&quot;Submission contains duplicate IDs.&quot;)
+
+    merged = solution.merge(
+        submission,
+        on=row_id_column_name,
+        how=&quot;inner&quot;,
+        suffixes=(&quot;_true&quot;, &quot;_pred&quot;),
+    )
+    if len(merged) != len(solution):
+        raise MetricInputError(f&quot;Submission is missing {len(solution) - len(merged)} rows.&quot;)
+
+    primary = 0.0
+    secondary = 0.0
+    tertiary = 0.0
+    weight_sum = float(sum(WEIGHTS[col] for col in TARGET_COLUMNS))
+
+    for col in TARGET_COLUMNS:
+        pred_col = f&quot;{col}_pred&quot;
+        true_col = f&quot;{col}_true&quot;
+        merged[pred_col] = pd.to_numeric(merged[pred_col], errors=&quot;coerce&quot;)
+        if merged[pred_col].isna().any():
+            raise MetricInputError(f&quot;Column &#x27;{col}&#x27; contains missing or non-numeric values.&quot;)
+
+        y_true = merged[true_col].to_numpy(dtype=float)
+        y_pred = merged[pred_col].to_numpy(dtype=float)
+        if not np.isfinite(y_pred).all():
+            raise MetricInputError(f&quot;Column &#x27;{col}&#x27; contains infinite values.&quot;)
+
+        err = y_pred - y_true
+        normalized_abs = np.abs(err) / TOLERANCES[col]
+        normalized_sq = (err / TOLERANCES[col]) ** 2
+        weight = WEIGHTS[col]
+
+        primary += weight * float(np.mean(normalized_abs))
+        secondary += weight * float(np.median(normalized_abs))
+        tertiary += weight * float(np.sqrt(np.mean(normalized_sq)))
+
+    primary /= weight_sum
+    secondary /= weight_sum
+    tertiary /= weight_sum
+    return primary + EPS_SECONDARY * secondary + EPS_TERTIARY * tertiary</code></pre></details><p>Competition images, expert-benchmark files and trained weights are not included; they have separate provider terms.</p></section><section class="source-section" id="about"><h2>About the studies</h2><p>Generated with AI.</p><p>The code is <a href="licenses/MIT.txt">MIT-licensed</a>. The Lora typeface uses the <a href="licenses/OFL-Lora.txt">SIL Open Font License</a>.</p></section></main><footer class="wrap foot"><span>LacrimaeAware</span><a href="sources.html">Sources and notes</a></footer></body></html>

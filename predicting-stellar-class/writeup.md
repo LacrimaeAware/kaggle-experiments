@@ -11,7 +11,7 @@ Predict `class`, the type of an astronomical object, one of GALAXY, QSO (quasar)
 
 Baseline: LightGBM multiclass (objective multiclass, three classes) with 5-fold StratifiedKFold cross-validation on the class label and balanced class weights (LightGBM class_weight balanced). The two categorical fields (spectral_type, 4 values; galaxy_population, 2 values) are passed as pandas category dtype; the eight numeric fields are used as is. The score is out-of-fold balanced accuracy, which mirrors the competition metric. The submission file uses the mean test-set class probabilities across the five folds, with the predicted label as the argmax. Code in baseline.py.
 
-Experiments 01 to 04 tested engineered features and per-class thresholds without a gain above the reported 0.0002 out-of-fold noise floor. The latest recorded model is the experiment 06 stack: LightGBM, XGBoost, CatBoost, and HistGradientBoosting base models with a balanced logistic-regression meta-model on out-of-fold log-probabilities. It uses the 10 raw features with ordinal-encoded categoricals. Threshold calibration was tested and added no out-of-fold gain. See [experiment 06](experiments/06_stacked_ensemble/stacked_ensemble.md) for the setup and component scores. Code in experiments6.py.
+Experiments 01 to 04 tested engineered features and per-class thresholds. Experiment 06 retained the ten raw features. The latest recorded model is the experiment 06 stack: LightGBM, XGBoost, CatBoost, and HistGradientBoosting base models with a balanced logistic-regression meta-model on out-of-fold log-probabilities. It uses the 10 raw features with ordinal-encoded categoricals. Threshold calibration was tested and added no out-of-fold gain. See [experiment 06](experiments/06_stacked_ensemble/stacked_ensemble.md) for the setup and component scores. Code in experiments6.py.
 
 ## Result
 
@@ -26,17 +26,13 @@ Public leaderboard scores are recorded as follows. The baseline's 0.96523 comes 
 
 ## Caveat
 
-The baseline out-of-fold balanced accuracy uses early stopping on each validation fold, which makes it mildly optimistic as an estimate of generalization. The public leaderboard score is computed on a subset of the test set; no private score or final standing is recorded in this repository. The stack's public score rests on a ledger entry without a kept submission record, so the comparison that stands on measured evidence is the out-of-fold one: 0.96596 against 0.9640. The stack results come from the single configuration per base model documented in experiment 06. Agreement between local and public scores alone does not establish the absence of leakage.
+The baseline out-of-fold balanced accuracy uses early stopping on each validation fold, which makes it mildly optimistic as an estimate of generalization. The public leaderboard score is computed on a subset of the test set. The stack's public score rests on a ledger entry without a kept submission record, so the comparison that stands on measured evidence is the out-of-fold one: 0.96596 against 0.9640. The stack results come from the single configuration per base model documented in experiment 06.
 
 ## Lesson
 
-The strongest recorded gain came from revising the model ensemble, rather than adding the tested engineered features. Experiments 01 to 04 did not improve on the baseline beyond the reported out-of-fold variation. Experiment 06 combined diverse tree models through a logistic-regression stack and reached 0.96596 OOF balanced accuracy before threshold calibration; threshold calibration reduced that score slightly to 0.96591.
+The strongest recorded gain came from revising the model ensemble, rather than adding the tested engineered features. Experiment 06 combined diverse tree models through a logistic-regression stack and reached 0.96596 OOF balanced accuracy before threshold calibration; threshold calibration reduced that score slightly to 0.96591.
 
-The saved results support that comparison for these runs. A useful follow-up would fix a held-out evaluation split before further feature or model selection, then compare the revised LightGBM configuration with the full stack. The present experiments do not establish an upper bound on what these features can predict. The experiments in order, with the noise-floor lesson and the out-of-fold versus public-score distinction, are in [JOURNEY.md](JOURNEY.md).
-
-## Leaderboard interpretation
-
-The public score is an additional measurement on the competition's public test subset. A final private score and final rank are not recorded here. Forum discussions about leaderboard variance and possible performance ceilings are context rather than evidence for a statistical ceiling in this experiment.
+The saved results support that comparison for these runs. A useful follow-up would fix a held-out evaluation split before further feature or model selection, then compare the revised LightGBM configuration with the full stack. The experiments in order, with the seed-variation check and the out-of-fold versus public-score distinction, are in [JOURNEY.md](JOURNEY.md).
 
 ## Data
 

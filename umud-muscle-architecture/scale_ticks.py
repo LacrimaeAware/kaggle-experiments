@@ -45,9 +45,7 @@ def _rel_pct(a, b):
 def _subpixel_refine(prof, raw_spacing, smin, smax, max_pct=2.0):
     """Refine an existing accepted spacing only when the sub-pixel comb agrees.
 
-    This makes sub-pixel estimation a precision pass, not a new detector that can
-    silently reroute an image. If it disagrees with the old trusted cue, keep the
-    old spacing and expose no refined fields.
+    Keep the original spacing when the refinement differs by more than max_pct.
     """
     if not USE_SUBPIXEL_REFINEMENT or SPS is None:
         return None
@@ -210,8 +208,7 @@ def _autocorr_period(prof, smin=25, smax=220):
 def recover_scale_faint_left(gray, x_max=70, win=16, tick_cm=0.5, min_strength=0.30):
     """Autocorrelation reader for a FAINT left-edge ruler (the bright-pixel detector misses these).
     Restricts to the left UI margin (x < x_max) to exclude content/text, slides a narrow strip, and
-    takes the most-periodic offset. period -> px/cm at 0.5 cm ticks (validated by MT plausibility:
-    1 cm gives an absurd 56 mm, 0.5 cm gives ~28 mm)."""
+    takes the most-periodic offset. Convert the period to px/cm using 0.5 cm ticks."""
     band = gray[:, :x_max].astype(np.float32)
     best = None
     for off in range(0, max(1, x_max - win), 4):
@@ -233,11 +230,11 @@ def recover_scale_faint_left(gray, x_max=70, win=16, tick_cm=0.5, min_strength=0
 
 
 def recover_scale_family_b_signature(gray, sig=(73, 82, 293, 302), tol=4, scale=147.0):  # was 134.5; hand tick-reading + LB confirm ~147 (2026-06-14)
-    """Recognize the family-B instrument by its FIXED left-margin UI marks (focus markers/labels at
-    fixed canvas rows, independent of depth) and return its validated fixed scale. The faint ruler on
-    these images is not robustly periodic (autocorrelation false-positives); but the 49 family-B images
-    we DO read via bottom ticks are all exactly 134 px/cm, and family C never matches this signature
-    (49/49 vs 0/87), so a signature match reliably implies the 134 scale."""
+    """Recognize family-B by fixed left-margin UI marks and use 147 px/cm.
+
+    This is an assigned instrument scale, not a per-image ruler estimate.
+    The calibration was changed from 134.5 px/cm after June 2026 tick checks.
+    """
     col = gray[:, :25].max(axis=1)
     ys = np.where(col > np.percentile(col, 97))[0]
     if len(ys) == 0:
@@ -268,7 +265,7 @@ def recover_for_image_detail(gray, name=""):
     `recover_for_image` below preserves the historical tuple API.
     """
     h, w = gray.shape
-    if name.lower().endswith(".png"):           # PNG: proven left numbered ruler (5 mm minor ticks)
+    if name.lower().endswith(".png"):           # PNG left numbered ruler (5 mm minor ticks)
         import tick_calibration as TC
         c = TC.png_left_ruler_candidate(gray, 5.0)
         if c is not None and c.confidence >= 0.5:
@@ -287,13 +284,13 @@ def recover_for_image_detail(gray, name=""):
     # bottom ticks: only trust HIGH confidence (Telemed 800x1200 + clean cropped).
     d = recover_scale(gray, tick_cm=1.0)
     if d and d["conf"] >= 0.9 and 50 <= d["scale_px_per_cm"] <= 200:
-        d["scale_px_per_cm"] *= 1.095  # hand tick-readings ran ~10% above this reader (2026-06-14, 3/3 images); root cause in the tick detector TBD
+        d["scale_px_per_cm"] *= 1.095  # Empirical correction from three hand-read images (2026-06-14).
         return _detail("bottom_ticks", d)
     if (h, w) == (800, 1200):  # German Siemens: faint right-edge 5 mm depth ruler (-> ~136 px/cm)
         d = recover_scale_right_ruler(gray, tick_cm=0.5)
         if d and d["conf"] >= 0.5 and 80 <= d["scale_px_per_cm"] <= 200:
             return _detail("right_ruler_5mm", d)
-        d = recover_scale_family_b_signature(gray)  # instrument recognition -> validated fixed scale 134
+        d = recover_scale_family_b_signature(gray)  # instrument recognition -> calibrated fixed scale
         if d:
             return _detail("family_b_signature", d)
     return {"scale_px_per_cm": None, "method": "none", "conf": 0.0}

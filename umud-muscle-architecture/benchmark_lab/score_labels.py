@@ -182,9 +182,9 @@ def apo_boundary_groups(apo_mask: np.ndarray) -> list[tuple[float, np.ndarray, n
 
 
 def measure_light(apo_mask: np.ndarray, fasc_mask: np.ndarray) -> dict[str, float] | None:
-    """Production-shaped mask geometry using only cv2/numpy.
+    """Mask geometry using only cv2/numpy.
 
-    This intentionally mirrors the safe fragment-FL baseline: top/bottom aponeurosis components,
+    This intentionally mirrors the fragment-FL baseline: top/bottom aponeurosis components,
     inner-edge MT, area-weighted PA, and median fragment extrapolated FL.
     """
     apo_mask = np.ascontiguousarray(apo_mask, np.uint8)

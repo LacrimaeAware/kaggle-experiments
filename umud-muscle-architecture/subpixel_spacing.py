@@ -1,7 +1,7 @@
 """Sub-pixel ruler spacing estimator.
 
-This is the production-side copy of the scale-brief estimator: harmonic-validated
-ACF for the coarse comb period, followed by sub-pixel tick-position regression.
+Harmonic-validated autocorrelation estimates the coarse comb period, followed
+by sub-pixel tick-position regression.
 It returns None rather than falling back to a raw integer-gap estimate when the
 comb evidence or regression fit is weak.
 """

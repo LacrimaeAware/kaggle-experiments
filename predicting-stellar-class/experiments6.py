@@ -1,19 +1,12 @@
-"""Experiment 06: stacked ensemble with threshold calibration.
+"""Experiment 06: five-model tree ensemble with threshold calibration.
 
-The recipe described by top public entries: a diverse base-model zoo, a
-balanced-logistic meta-model stacked on the out-of-fold class log-probabilities,
-then per-class threshold calibration by differential evolution, all evaluated
-under nested cross-validation (the meta-model and the thresholds never see the
-rows they are scored on).
+Two LightGBMs, XGBoost, CatBoost and HistGradientBoosting supply out-of-fold
+class probabilities. A balanced logistic meta-model combines their logarithms;
+per-class multipliers are fitted by differential evolution on separate
+out-of-fold rows. The reference baseline scored 0.9640 out-of-fold.
 
-This builds a GBDT/tree zoo (two LightGBMs, XGBoost, CatBoost,
-HistGradientBoosting). It omits the neural-tabular models (RealMLP, TabM) that
-top entries use, which need a GPU. The comparison point is the single-LightGBM
-first attempt (OOF 0.9640).
-
-Run from predicting-stellar-class/ in the project .venv:
-    python experiments6.py
-"""
+Run from predicting-stellar-class/:
+    python experiments6.py"""
 
 from pathlib import Path
 import sys
@@ -126,7 +119,7 @@ def main():
         return np.hstack([np.log(np.clip(d[k], 1e-7, 1.0)) for k in models])
     Soof, Ste = stack(base_oof), stack(base_test)
 
-    # 3. meta-model (balanced logreg), honest OOF via CV over the stack features
+    # 3. Cross-validate balanced logistic regression on the stack features.
     meta_oof = np.zeros((n, 3))
     for tr, va in folds:
         lr = LogisticRegression(class_weight="balanced", max_iter=2000, C=1.0)
@@ -135,7 +128,7 @@ def main():
     ba_meta = balanced_accuracy_score(y, meta_oof.argmax(1))
     print(f"meta (balanced logreg) OOF bal_acc {ba_meta:.5f}")
 
-    # 4. threshold calibration, nested: fit weights on disjoint OOF rows
+    # 4. Fit threshold weights on separate folds of the out-of-fold predictions.
     thr_folds = list(StratifiedKFold(NF, shuffle=True, random_state=SEED + 1).split(meta_oof, y))
     cal_pred = np.zeros(n, dtype=int)
     for tr, va in thr_folds:
