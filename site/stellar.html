@@ -1,2 +1,203 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stellar classification · Kaggle experiments</title><meta name="description" content="Kaggle projects for learning classification, image measurement and game-agent techniques."><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#content">Skip to the study</a><header class="wrap mast"><a class="brand" href="index.html">Kaggle experiments</a><nav aria-label="Studies"><a href="index.html">Overview</a><a href="stellar.html" aria-current="page">Stellar classes</a><a href="ultrasound.html">Ultrasound</a></nav></header><main class="wrap" id="content"><article><header class="source-intro"><div class="intro"><h1>Stellar<br>classification</h1><p>Comparing feature changes and model combinations for classifying stars, galaxies and quasars.</p></div></header><nav class="chapters" aria-label="Stellar chapters"><a href="#question">Data and validation</a><a href="#experiments">Experiments</a><a href="#result">Stacking</a><a href="#limits">Validation limits</a></nav><section class="chapter" id="question"><h2>Data and validation</h2><div class="chapter-body"><p>The target was GALAXY, QSO (quasar) or STAR, using sky coordinates, brightness in five bands, redshift and two categorical fields. Balanced accuracy gives each class equal weight.</p><p>Validation split the 577,347 rows into five folds with similar class proportions. Each row was predicted by a model trained on the other folds: an out-of-fold prediction. Comparisons reused these splits; learned feature transforms were fitted only on training rows.</p><p>Revising LightGBM supplied part of the improvement; combining models added a smaller gain. Threshold calibration slightly reduced the score.</p><figure class="figure" aria-labelledby="stellar-results"><div class="figure-title" id="stellar-results">Model validation results</div><p class="figure-unit">Out-of-fold balanced accuracy · 8 June 2026 · higher is better</p><div class="dot-plot"><div class="plot-row"><span class="plot-label">Original LightGBM</span><div class="dot-track" aria-hidden="true"><i class="dot" style="--x:16.6667%"></i></div><span class="plot-value">0.9640</span></div><div class="plot-row"><span class="plot-label">Revised LightGBM</span><div class="dot-track" aria-hidden="true"><i class="dot" style="--x:56.0000%"></i></div><span class="plot-value">0.96518</span></div><div class="plot-row"><span class="plot-label">Five-model stack</span><div class="dot-track" aria-hidden="true"><i class="dot best" style="--x:82.0000%"></i></div><span class="plot-value">0.96596</span></div><div class="plot-row"><span class="plot-label">Stack + calibration</span><div class="dot-track" aria-hidden="true"><i class="dot" style="--x:80.3333%"></i></div><span class="plot-value">0.96591</span></div><div class="dot-axis" aria-hidden="true"><span></span><div class="axis-values"><span style="left:16.667%">.964</span><span style="left:50%">.965</span><span style="left:83.333%">.966</span></div><span></span></div></div><figcaption>The revised single model supplied part of the gain. Threshold calibration added no improvement.</figcaption></figure></div></section><section class="chapter" id="experiments"><h2>Feature and model comparisons</h2><div class="chapter-body"><p>Recorded 8 June 2026. Early screens used stratified subsamples, with score changes measured against a baseline on the same sample. The initial baseline and final stack used the full training set.</p><p>The best feature change was +0.00018. Later experiments tested different model families and ways to combine their predictions.</p><div class="table-wrap" tabindex="0" role="region" aria-label="Experiments 01–06, recorded 8 June 2026"><table class=""><caption>Experiments 01–06, recorded 8 June 2026</caption><thead><tr><th scope="col">Experiment</th><th scope="col">Change</th><th scope="col">Observed result</th></tr></thead><tbody><tr><th scope="row">Feature screen</th><td>Colour indices, spectral features, PCA and density features.</td><td>Best change: +0.00018 from PCA features.</td></tr><tr><th scope="row">Noise and capacity</th><td>Three seeds, a larger LightGBM and neighbour features.</td><td>Seed standard deviation about 0.0002. Larger model −0.00595; neighbour features −0.00053.</td></tr><tr><th scope="row">Diagnostics</th><td>Stellar-locus distance, UV excess and threshold checks.</td><td>No gain; redshift supplied 0.554 of feature-importance gain.</td></tr><tr><th scope="row">Model diversity</th><td>An untuned CatBoost and a LightGBM blend.</td><td>CatBoost −0.00738; the blend favoured LightGBM alone.</td></tr><tr><th scope="row">Stacking</th><td>Five tree models, logistic combination and thresholds.</td><td>0.96596 before calibration; 0.96591 after it.</td></tr></tbody></table></div></div></section><section class="chapter" id="result"><h2>Stacking comparison</h2><div class="chapter-body"><p>The stack used a logistic regression model to combine the five models’ out-of-fold predictions.</p><details><summary>Base-model scores from experiment 06</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Out-of-fold balanced accuracy"><table class="short-table"><caption>Out-of-fold balanced accuracy</caption><thead><tr><th scope="col">Model</th><th scope="col">Score</th></tr></thead><tbody><tr><th scope="row">Balanced LightGBM</th><td>0.96518</td></tr><tr><th scope="row">Unbalanced LightGBM</th><td>0.95469</td></tr><tr><th scope="row">XGBoost</th><td>0.96396</td></tr><tr><th scope="row">CatBoost</th><td>0.95682</td></tr><tr><th scope="row">HistGradientBoosting</th><td>0.96424</td></tr><tr><th scope="row">Logistic stack</th><td>0.96596</td></tr></tbody></table></div></details></div></section><section class="chapter" id="limits"><h2>Validation limits</h2><div class="chapter-body"><p>Each base model used one configuration. The baseline also used its validation folds for early stopping, making that estimate mildly optimistic.</p><p><a href="sources.html#stellar">Public-score records and validation code</a></p></div></section><nav class="next-study" aria-label="Next study"><a href="index.html">All studies</a><a href="ultrasound.html">Muscle ultrasound study</a></nav></article></main><footer class="wrap foot"><span>LacrimaeAware</span><a href="sources.html">Sources and notes</a></footer></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stellar classification · Kaggle experiments</title>
+<meta name="description" content="Kaggle projects for learning classification, image measurement and game-agent techniques.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to the study</a>
+<header class="wrap mast">
+<a class="brand" href="index.html">Kaggle experiments</a>
+<nav aria-label="Studies">
+<a href="index.html">Overview</a>
+<a href="stellar.html" aria-current="page">Stellar classes</a>
+<a href="ultrasound.html">Ultrasound</a>
+</nav>
+</header>
+<main class="wrap" id="content">
+<article>
+<header class="source-intro">
+<div class="intro">
+<h1>Stellar<br>classification</h1>
+<p>Comparing feature changes and model combinations for classifying stars, galaxies and quasars.</p>
+</div>
+</header>
+<nav class="chapters" aria-label="Stellar chapters">
+<a href="#question">Data and validation</a>
+<a href="#experiments">Experiments</a>
+<a href="#result">Stacking</a>
+<a href="#limits">Validation</a>
+</nav>
+<section class="chapter" id="question">
+<h2>Data and validation</h2>
+<div class="chapter-body">
+<p>The target was GALAXY, QSO (quasar) or STAR, using sky coordinates, brightness in five bands, redshift and two categorical fields. Balanced accuracy gives each class equal weight.</p>
+<p>Validation split the 577,347 rows into five folds with similar class proportions. Each row was predicted by a model trained on the other folds: an out-of-fold prediction. Comparisons reused these splits; learned feature transforms were fitted only on training rows.</p>
+<figure class="figure" aria-labelledby="stellar-results">
+<div class="figure-title" id="stellar-results">Model validation results</div>
+<p class="figure-unit">Out-of-fold balanced accuracy · 8 June 2026 · higher is better</p>
+<div class="dot-plot">
+<div class="plot-row">
+<span class="plot-label">Original LightGBM</span>
+<div class="dot-track" aria-hidden="true">
+<i class="dot" style="--x:16.6667%">
+</i>
+</div>
+<span class="plot-value">0.9640</span>
+</div>
+<div class="plot-row">
+<span class="plot-label">Revised LightGBM</span>
+<div class="dot-track" aria-hidden="true">
+<i class="dot" style="--x:56.0000%">
+</i>
+</div>
+<span class="plot-value">0.96518</span>
+</div>
+<div class="plot-row">
+<span class="plot-label">Five-model stack</span>
+<div class="dot-track" aria-hidden="true">
+<i class="dot best" style="--x:82.0000%">
+</i>
+</div>
+<span class="plot-value">0.96596</span>
+</div>
+<div class="plot-row">
+<span class="plot-label">Stack + calibration</span>
+<div class="dot-track" aria-hidden="true">
+<i class="dot" style="--x:80.3333%">
+</i>
+</div>
+<span class="plot-value">0.96591</span>
+</div>
+<div class="dot-axis" aria-hidden="true">
+<span>
+</span>
+<div class="axis-values">
+<span style="left:16.667%">.964</span>
+<span style="left:50%">.965</span>
+<span style="left:83.333%">.966</span>
+</div>
+<span>
+</span>
+</div>
+</div>
+<figcaption>The revised single model supplied part of the gain. Threshold calibration added no improvement.</figcaption>
+</figure>
+</div>
+</section>
+<section class="chapter" id="experiments">
+<h2>Feature and model comparisons</h2>
+<div class="chapter-body">
+<p>Early screens used stratified subsamples, with score changes measured against a baseline on the same sample. The initial baseline and final stack used the full training set.</p>
+<p>The best feature change was +0.00018. Later experiments tested different model families and ways to combine their predictions.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Feature and model comparisons">
+<table class="">
+<caption>Feature and model comparisons</caption>
+<thead>
+<tr>
+<th scope="col">Experiment</th>
+<th scope="col">Change</th>
+<th scope="col">Observed result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row">Feature screen</th>
+<td>Colour indices, spectral features, PCA and density features.</td>
+<td>Best change: +0.00018 from PCA features.</td>
+</tr>
+<tr>
+<th scope="row">Noise and capacity</th>
+<td>Three seeds, a larger LightGBM and neighbour features.</td>
+<td>Seed standard deviation about 0.0002. Larger model −0.00595; neighbour features −0.00053.</td>
+</tr>
+<tr>
+<th scope="row">Diagnostics</th>
+<td>Stellar-locus distance, UV excess and threshold checks.</td>
+<td>No gain; redshift supplied 0.554 of feature-importance gain.</td>
+</tr>
+<tr>
+<th scope="row">Model diversity</th>
+<td>An untuned CatBoost and a LightGBM blend.</td>
+<td>CatBoost −0.00738; the blend favoured LightGBM alone.</td>
+</tr>
+<tr>
+<th scope="row">Stacking</th>
+<td>Five tree models, logistic combination and thresholds.</td>
+<td>0.96596 before calibration; 0.96591 after it.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section class="chapter" id="result">
+<h2>Stacking comparison</h2>
+<div class="chapter-body">
+<p>The stack used a logistic regression model to combine the five models’ out-of-fold predictions.</p>
+<details>
+<summary>Base-model scores from experiment 06</summary>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Out-of-fold balanced accuracy">
+<table class="short-table">
+<caption>Out-of-fold balanced accuracy</caption>
+<thead>
+<tr>
+<th scope="col">Model</th>
+<th scope="col">Score</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row">Balanced LightGBM</th>
+<td>0.96518</td>
+</tr>
+<tr>
+<th scope="row">Unbalanced LightGBM</th>
+<td>0.95469</td>
+</tr>
+<tr>
+<th scope="row">XGBoost</th>
+<td>0.96396</td>
+</tr>
+<tr>
+<th scope="row">CatBoost</th>
+<td>0.95682</td>
+</tr>
+<tr>
+<th scope="row">HistGradientBoosting</th>
+<td>0.96424</td>
+</tr>
+<tr>
+<th scope="row">Logistic stack</th>
+<td>0.96596</td>
+</tr>
+</tbody>
+</table>
+</div>
+</details>
+</div>
+</section>
+<section class="chapter" id="limits">
+<h2>Validation</h2>
+<div class="chapter-body">
+<p>Each base model used one configuration. The baseline also used its validation folds for early stopping, making that estimate mildly optimistic.</p>
+<p>
+<a href="sources.html#stellar">Method and model details</a>
+</p>
+</div>
+</section>
+<nav class="next-study" aria-label="Next study">
+<a href="index.html">All studies</a>
+<a href="ultrasound.html">Muscle ultrasound study</a>
+</nav>
+</article>
+</main>
+<footer class="wrap foot">
+<span>LacrimaeAware</span>
+<a href="sources.html">Methods and sources</a>
+</footer>
+</body>
+</html>

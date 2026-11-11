@@ -1,5 +1,14 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Source notes · Kaggle experiments</title><meta name="description" content="Kaggle projects for learning classification, image measurement and game-agent techniques."><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#content">Skip to the study</a><header class="wrap mast"><a class="brand" href="index.html">Kaggle experiments</a><nav aria-label="Studies"><a href="index.html">Overview</a><a href="stellar.html">Stellar classes</a><a href="ultrasound.html">Ultrasound</a></nav></header><main class="wrap" id="content"><header class="source-intro"><h1>Sources and notes</h1><p>Data, validation, result records and selected code from the stellar and ultrasound experiments.</p></header><section class="source-section" id="stellar"><h2>Stellar classification</h2><p>The full-data baseline and stack used five stratified folds, seed 42 and 577,347 training rows. Earlier screens used stratified subsamples.</p><div class="table-wrap" tabindex="0" role="region" aria-label="Stellar public-score records"><table><caption>Public-score records</caption><thead><tr><th scope="col">Result</th><th scope="col">Record</th></tr></thead><tbody><tr><th scope="row">Baseline · 0.96523</th><td>Submission recorded on 8 June 2026; the file hash was not recorded.</td></tr><tr><th scope="row">Stack · 0.96659</th><td>Ledger entry without a kept submission record. The same-day experiment note lists its output as not submitted.</td></tr></tbody></table></div><details><summary>Five-fold model comparison: run_cv</summary><pre><code>def run_cv(cfg, X, y, X_test, classes):
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Methods and sources · Kaggle experiments</title><meta name="description" content="Classification and ultrasound measurement experiments.">
+<link rel="stylesheet" href="style.css"></head>
+<body><a class="skip" href="#content">Skip to the study</a>
+<header class="wrap mast"><a class="brand" href="index.html">Kaggle experiments</a><nav aria-label="Studies"><a href="index.html">Overview</a><a href="stellar.html">Stellar classes</a><a href="ultrasound.html">Ultrasound</a></nav></header>
+<main class="wrap" id="content"><article>
+<header class="source-intro"><div class="intro"><h1>Methods<br>and sources</h1><p>Cross-validation, measurement definitions and the methods behind the studies.</p></div></header>
+<section class="chapter" id="stellar"><h2>Stellar classification</h2><div class="chapter-body"><p>The models used five stratified folds. Each row was predicted by a model trained on the other folds, so the comparison used out-of-fold predictions.</p>
+<details><summary>Cross-validation code</summary><pre><code>def run_cv(cfg, X, y, X_test, classes):
     &quot;&quot;&quot;StratifiedKFold CV. Returns OOF probabilities, mean test probabilities,
     and the out-of-fold balanced accuracy.&quot;&quot;&quot;
     n_class = len(classes)
@@ -26,8 +35,10 @@
 
     oof_score = balanced_accuracy_score(y, oof.argmax(1))
     print(f&quot;OOF balanced accuracy: {oof_score:.4f}&quot;)
-    return oof, test_pred, oof_score</code></pre></details><p><a href="https://www.kaggle.com/competitions/playground-series-s6e6">Stellar classification competition</a></p></section><section class="source-section" id="ultrasound"><h2>Ultrasound measurements</h2>
-<p><a href="https://www.kaggle.com/competitions/umud-challenge-muscle-architecture-in-ultrasound-data/overview/description">UMUD competition and measurement definitions</a></p><p>The best file was <code>submission_thr_a0.50_f0.30.csv</code> (309 rows), recorded 1 July 2026. Its command was reconstructed from the script and filename; its Kaggle upload was not independently confirmed. The documented median-length pipeline scored 0.47473 on 15 June 2026.</p><details><summary>Local metric: umud_score</summary><pre><code>def umud_score(
+    return oof, test_pred, oof_score</code></pre></details>
+<p><a href="https://www.kaggle.com/competitions/playground-series-s6e6">Stellar classification competition</a> · <a href="https://github.com/LacrimaeAware/kaggle-experiments/blob/main/predicting-stellar-class/experiments6.py">Stacking code</a></p></div></section>
+<section class="chapter" id="ultrasound"><h2>Ultrasound measurements</h2><div class="chapter-body"><p>The metric averages the angle, length and thickness errors after dividing by their respective tolerances. Small median-error and RMSE terms break ties.</p>
+<details><summary>Measurement-error code</summary><pre><code>def umud_score(
     solution: pd.DataFrame,
     submission: pd.DataFrame,
     row_id_column_name: str = &quot;image_id&quot;,
@@ -87,4 +98,12 @@
     primary /= weight_sum
     secondary /= weight_sum
     tertiary /= weight_sum
-    return primary + EPS_SECONDARY * secondary + EPS_TERTIARY * tertiary</code></pre></details><p>Competition images, expert-benchmark files and trained weights are not included; they have separate provider terms.</p></section><section class="source-section" id="about"><h2>About the studies</h2><p>Generated with AI.</p><p>The code is <a href="licenses/MIT.txt">MIT-licensed</a>. The Lora typeface uses the <a href="licenses/OFL-Lora.txt">SIL Open Font License</a>.</p></section></main><footer class="wrap foot"><span>LacrimaeAware</span><a href="sources.html">Sources and notes</a></footer></body></html>
+    return primary + EPS_SECONDARY * secondary + EPS_TERTIARY * tertiary</code></pre></details>
+<p>The November ensemble follows <a href="https://www.kaggle.com/code/prvsiyan/trying-some-stuff-with-ultrasound-geometry">prvsiyan's geometry and texture method</a>, which builds on <a href="https://www.kaggle.com/code/mawramusawwar/umud-two-u-nets-texture-angle-lb-0-30652">mawramusawwar's measurement recipe</a> and <a href="https://www.kaggle.com/code/watehell/ans-is-simple-physical-scale-u-net-geometry">watehell's training recipe</a>. The notebook code uses Apache 2.0.</p>
+<ul><li><a href="https://www.kaggle.com/datasets/watehell/umud-r34-unet-weights">Base U-Net pair</a>, CC BY-NC-SA 4.0.</li><li><a href="https://www.kaggle.com/datasets/prvsiyan/umud-r34-5fold-unet-weights">Five-fold U-Net pairs</a>, CC BY-NC 4.0.</li></ul>
+<p><a href="https://www.kaggle.com/competitions/umud-challenge-muscle-architecture-in-ultrasound-data/overview/description">UMUD competition and measurement definitions</a> · <a href="https://github.com/LacrimaeAware/kaggle-experiments/blob/main/umud-muscle-architecture/mask_geometry.py">Geometry examples</a></p>
+</div></section>
+<section class="chapter"><h2>Licenses</h2><div class="chapter-body"><p>The selected code uses the <a href="licenses/MIT.txt">MIT license</a>. Lora uses the <a href="licenses/OFL-Lora.txt">SIL Open Font License</a>. Competition data and third-party models retain their providers' terms.</p></div></section>
+</article></main>
+<footer class="wrap foot"><span>LacrimaeAware</span><a href="sources.html">Methods and sources</a></footer>
+</body></html>
